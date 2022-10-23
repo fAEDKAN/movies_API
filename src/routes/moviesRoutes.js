@@ -9,7 +9,7 @@ router
     .get('/recommended', recommended)
     .get('/:id', getById)
     .post('/', create)
-    .put('/:id', update)
+    .patch('/:id', update)
     .delete('/:id', destroy)
 
 module.exports = router;

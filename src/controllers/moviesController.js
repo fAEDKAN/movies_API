@@ -3,6 +3,7 @@ const db = require("../database/models");
 const { Op } = require("sequelize");
 const moment = require("moment");
 const { createError, getUrl, getUrlBase } = require("../helpers");
+const { userInfo } = require("os");
 
 //Aquí tienen otra forma de llamar a cada uno de los modelos
 const Movies = db.Movie;
@@ -106,8 +107,6 @@ module.exports = {
                 "DD-MM-YYYY"
             );
 
-            console.log(getUrl(req.originalUrl));
-
             return res.status(200).json({
                 ok: true,
                 meta: {
@@ -197,25 +196,7 @@ module.exports = {
         const { title, rating, awards, release_date, length, genre_id } =
             req.body;
 
-        let errors = [];
-
         try {
-            for (const key in req.body) {
-                if (!req.body[key]) {
-                    errors = [
-                        ...errors,
-                        {
-                            field: key,
-                            msg: `El campo ${key} es obligatorio`,
-                        },
-                    ];
-                }
-            }
-
-            if (errors.length) {
-                throw createError(400, "Ups... Hay errores");
-            }
-
             const movie = await db.Movie.create({
                 title: title?.trim(),
                 rating,
@@ -236,41 +217,130 @@ module.exports = {
             });
         } catch (error) {
             console.log(error);
+            const showErrors = error.errors.map((error) => {
+                return {
+                    path: error.path,
+                    message: error.message,
+                };
+            });
             return res.status(error.status || 500).json({
                 ok: false,
                 status: error.status || 500,
-                msg: error.message,
+                errors: showErrors,
             });
         }
     },
 
-    update: function (req, res) {
-        let movieId = req.params.id;
-        Movies.update(
-            {
-                title: req.body.title,
-                rating: req.body.rating,
-                awards: req.body.awards,
-                release_date: req.body.release_date,
-                length: req.body.length,
-                genre_id: req.body.genre_id,
-            },
-            {
-                where: { id: movieId },
-            }
-        )
-            .then(() => {
-                return res.redirect("/movies");
-            })
-            .catch((error) => res.send(error));
+    update: async (req, res) => {
+        const { title, rating, awards, release_date, length, genre_id } =
+            req.body;
+        try {
+            let movieId = req.params.id;
+            let movie = await db.Movie.findByPk(movieId);
+
+            movie.title = title?.trim() || movie.title;
+            movie.rating = rating || movie.rating;
+            movie.awards = awards || movie.awards;
+            movie.release_date = release_date || movie.release_date;
+            movie.length = length || movie.length;
+            movie.genre_id = genre_id || movie.genre_id;
+
+            await movie.save(); //lo que vengo modificando se guarda
+
+            return res.status(200).json({
+                ok: true,
+                meta: {
+                    status: 200,
+                },
+                msg: "Película actualizada con éxito",
+                data: {
+                    movie,
+                },
+            });
+        } catch (error) {
+            return res.status(error.status || 500).json({
+                ok: false,
+                status: error.status || 500,
+                message: error.message || "Ups... Error!!!",
+            });
+        }
     },
 
-    destroy: function (req, res) {
-        let movieId = req.params.id;
-        Movies.destroy({ where: { id: movieId }, force: true }) // force: true es para asegurar que se ejecute la acción
-            .then(() => {
-                return res.redirect("/movies");
+    /* update: async (req, res) => {
+        const { title, rating, awards, release_date, length, genre_id } =
+            req.body;
+
+        try {
+            let movieId = req.params.id;
+            let movie = await db.Movie.update(
+                {
+                    title: title?.trim(),
+                    rating,
+                    awards,
+                    release_date,
+                    length,
+                    genre_id,
+                },
+                {
+                    where: { id: movieId },
+                }
+            );
+
+            return res.status(201).json({
+                ok: true,
+                meta: {
+                    status: 201,
+                },
+                msg: "Película actualizada con éxito",
+            });
+        } catch (error) {
+            return res.status(error.status || 500).json({
+                ok: false,
+                status: error.status || 500,
+                errors: showErrors,
+            });
+        }
+    }, */
+
+    destroy: async (req, res) => {
+        try {
+            let movieId = req.params.id;
+            await db.Actor.update(
+                {
+                    favorite_movie_id: null,
+                },
+                {
+                    where: {
+                        favorite_movie_id: movieId,
+                    },
+                }
+            );
+            await db.ActorMovie.destroy({
+                where: {
+                    movie_id: movieId,
+                },
+            });
+
+            await db.Movie.destroy({
+                where: {
+                    id: movieId,
+                },
+                force: true,
+            }); //force: true -es para asegurar que se ejecute la acción
+            return res.status(200).json({
+                ok: true,
+                meta: {
+                    status: 200
+                },
+                msg: "Película eliminada con éxito"
             })
-            .catch((error) => res.send(error));
+        } catch (error) {
+            console.log(error);
+            return res.status(error.status || 500).json({
+                ok: false,
+                status: error.status || 500,
+                message: error.message || "Ups... Error!!!",
+            });
+        }
     },
 };

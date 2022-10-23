@@ -1,3 +1,6 @@
+const { objectValidate, defaultValidations } = require("../resources");
+const fecha = new Date();
+
 module.exports = (sequelize, dataTypes) => {
     let alias = "Movie"; // esto debería estar en singular
     let cols = {
@@ -13,25 +16,35 @@ module.exports = (sequelize, dataTypes) => {
             type: dataTypes.STRING(500),
             allowNull: false,
             validate: {
-                notNull: {
-                    msg: "El campo title no puede ser nulo",
-                },
-                notEmpty: {
-                    msg: "El título de la película es requerido",
-                },
+                ...defaultValidations,
             },
         },
         rating: {
             type: dataTypes.DECIMAL(3, 1).UNSIGNED,
             allowNull: false,
+            validate: {
+                ...defaultValidations,
+            },
         },
         awards: {
             type: dataTypes.BIGINT(10).UNSIGNED,
             allowNull: false,
+            validate: {
+                ...defaultValidations,
+            },
         },
         release_date: {
             type: dataTypes.DATEONLY,
             allowNull: false,
+            validate: {
+                ...defaultValidations,
+                isBefore: {
+                    args: `${fecha.getFullYear()}-${
+                        fecha.getMonth() + 1
+                    }-${fecha.getDate()}`,
+                    msg: "La fecha de estreno debe ser anterior a la fecha actual",
+                },
+            },
         },
         length: dataTypes.BIGINT(10),
         genre_id: dataTypes.BIGINT(10),
